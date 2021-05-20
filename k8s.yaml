@@ -1,0 +1,39 @@
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: s3-resync-config
+  annotations:
+    iam.amazonaws.com/role: arn:aws:iam::123456789:role/my-s3-role
+    iam.amazonaws.com/session-name: s3resync
+spec:
+  template:
+    spec:
+      containers:
+        - name: resync
+          image: fatz/restart-bucket-sync
+          env:
+            - name: RESYNC_INVENTORY_FILE_PATH
+              configMapKeyRef:
+                name: s3-resync-config
+                key: inventory_file_path
+            - name: RESYNC_INVENTORY_BUCKET_NAME
+              configMapKeyRef:
+                name: s3-resync-config
+                key: inventory_bucket_name
+            - name: RESYNC_DRY_RUN
+              configMapKeyRef:
+                name: s3-resync-config
+                key: dry_run
+      restartPolicy: Never
+  backoffLimit: 4
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: s3-resync-config
+data:
+  dry_run: "true"
+  inventory_bucket_name: "mybucketname"
+  inventory_file_path: "mybucketname/status-inventory/data/1234.csv.gz"
