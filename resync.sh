@@ -52,6 +52,10 @@ function main() {
     return 1
   fi
 
+  #start clean
+  rm -Rf "${TMP_FOLDER}/*"
+  rm -Rf "${TMP_FOLDER}/.*"
+
   if ! get_inventory; then
     echo "error getting inventory file"
     return 1
