@@ -12,20 +12,44 @@ spec:
       containers:
         - name: resync
           image: fatz/restart-bucket-sync
+          imagePullPolicy: Always
           env:
             - name: RESYNC_INVENTORY_FILE_PATH
-              configMapKeyRef:
-                name: s3-resync-config
-                key: inventory_file_path
+              valueFrom:
+                configMapKeyRef:
+                  name: s3-resync-config
+                  key: inventory_file_path
             - name: RESYNC_INVENTORY_BUCKET_NAME
-              configMapKeyRef:
-                name: s3-resync-config
-                key: inventory_bucket_name
+              valueFrom:
+                configMapKeyRef:
+                  name: s3-resync-config
+                  key: inventory_bucket_name
             - name: RESYNC_DRY_RUN
-              configMapKeyRef:
-                name: s3-resync-config
-                key: dry_run
+              valueFrom:
+                configMapKeyRef:
+                  name: s3-resync-config
+                  key: dry_run
+            - name: RESYNC_TMP_FOLDER
+              value: /resync
+            - name: AWS_DEFAULT_REGION
+              value: us-east-1
+          volumeMounts:
+            - mountPath: /resync
+              name: data
+              readOnly: false
+      initContainers:
+        - name: init
+          image: busybox:1.28
+          command: ['sh', '-c', "rm -Rf /resync/*"]
+          volumeMounts:
+            - mountPath: /resync
+              name: data
+              readOnly: false
       restartPolicy: Never
+      volumes:
+        - persistentVolumeClaim:
+            claimName: resync.data
+          name: data
   backoffLimit: 4
 
 ---
@@ -34,6 +58,24 @@ kind: ConfigMap
 metadata:
   name: s3-resync-config
 data:
-  dry_run: "true"
+  dry_run: "false"
   inventory_bucket_name: "mybucketname"
   inventory_file_path: "mybucketname/status-inventory/data/1234.csv.gz"
+
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    volume.beta.kubernetes.io/storage-provisioner: ebs.csi.aws.com
+  labels:
+    app: resync
+  name: resync.data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 250Gi
+  storageClassName: awsebscsiprovisioner
